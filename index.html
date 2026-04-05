@@ -24,9 +24,7 @@
     <div class="jumbotron">
         <div class="container text-center">
             <h1><b>台灣鐵路/軌道運行圖</b></h1>
-            <h2>⚠️本網站到2026.09.23網域租賃期滿為止⚠️</h2>
-            <h3>未來若要繼續參考運行圖，請自行至<a href="https://github.com/inhurstory/TRDynamicRailwayMap"
-                    target="_blank">GitHub專案頁面</a>找尋，感謝您的支持與愛護！</h3>
+            <h2>本網站為IHRail服際鐵路客製化版本</h2>
             <h3>今天日期：<span id="today_date"></span></h3>
         </div>
     </div>
@@ -147,44 +145,8 @@
 <script src="js/config.js"></script>
 <script src="js/util.js"></script>
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    const diagram_data = localStorage.getItem('is_confirmed');
     const today_date = getTodayFormattedDate();
-    if (diagram_data == null || typeof (diagram_data) == "undefined" || diagram_data !== "ok") {
-        Swal.fire({
-            title: '本網站做到2026.09.23網域名稱租賃期滿為止，敬請見諒！',
-            icon: 'warning',
-            text: '未來若要繼續參考運行圖，請自行至GitHub專案頁面找尋，感謝您的支持與愛護！',
-            width: 500,
-            heightAuto: true,
-            padding: '3em',
-            backdrop: `rgba(255, 255, 0, 0.2) no-repeat`,
-            confirmButtonText: '我了解了',
-
-        }).then((result) => {
-
-            Swal.fire({
-                title: '本網站聲明',
-                icon: 'warning',
-                text: '本站所提供的資料，僅供參考，實際鐵路運行情況，請以現場、各鐵路與軌道系統的管理單位所公布資訊或實際鐵路運作為準',
-                width: 500,
-                heightAuto: true,
-                padding: '3em',
-                backdrop: `rgba(255, 255, 0, 0.2) no-repeat`,
-                showDenyButton: true,
-                confirmButtonText: '我了解了',
-                denyButtonText: '我不同意',
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    Swal.fire('您將開始瀏覽本網站，本聲明將不再出現', '', 'success');
-                    window.localStorage.setItem("is_confirmed", "ok");
-                } else if (result.isDenied) {
-                    window.localStorage.setItem("is_confirmed", "nook");
-                }
-            })
-        })
-    }
 
     $(document).ready(function () {
         $('#web_name').append(web_name)

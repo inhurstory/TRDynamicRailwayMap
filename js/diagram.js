@@ -90,6 +90,7 @@ function draw_train_path(all_trains_data, realtime_trains) {
     last_manual_selected_segment_id = null;
     route_graph = null;
     wait_edge_elements = new Map();
+    selected_segment_blink_visible = true;
 
     for (let train_data of all_trains_data) {
         for (let [line_kind, train_no, train_kind, line, line_dir, value] of train_data) {
@@ -398,7 +399,7 @@ function select_segment(segment_id) {
 
     selected_segment_ids.add(segment_id);
     segment.removeClass('segment-hover');
-    segment.addClass('segment-selected');
+    update_segment_selected_visual(segment_id);
 }
 
 // 取消指定列車線段的選取狀態
@@ -411,6 +412,59 @@ function deselect_segment(segment_id) {
     selected_segment_ids.delete(segment_id);
     segment.removeClass('segment-selected');
     segment.removeClass('segment-hover');
+}
+
+// 依照目前選取與閃爍狀態，更新單一路段的顯示樣式
+function update_segment_selected_visual(segment_id) {
+    const segment = segment_elements.get(segment_id);
+    if (!segment) {
+        return;
+    }
+
+    const shouldShowSelected = selected_segment_ids.has(segment_id)
+        && (!selected_segments_blink_enabled || selected_segment_blink_visible);
+
+    if (shouldShowSelected) {
+        segment.addClass('segment-selected');
+    } else {
+        segment.removeClass('segment-selected');
+    }
+}
+
+// 批次刷新所有已選路段的顯示狀態
+function update_all_selected_segments_visuals() {
+    for (const segment_id of selected_segment_ids) {
+        update_segment_selected_visual(segment_id);
+    }
+
+    update_all_wait_edge_visuals();
+}
+
+// 切換已選路段的閃爍功能
+function set_selected_segments_blink_enabled(enabled) {
+    selected_segments_blink_enabled = enabled;
+    selected_segment_blink_visible = true;
+
+    if (selected_segment_blink_interval_id) {
+        clearInterval(selected_segment_blink_interval_id);
+        selected_segment_blink_interval_id = null;
+    }
+
+    if (selected_segments_blink_enabled) {
+        selected_segment_blink_interval_id = setInterval(toggle_selected_segments_blink_visibility, 500);
+    }
+
+    update_all_selected_segments_visuals();
+}
+
+// 將所有已選路段在顯示與隱藏間切換，重播既有選取動畫
+function toggle_selected_segments_blink_visibility() {
+    if (!selected_segments_blink_enabled) {
+        return;
+    }
+
+    selected_segment_blink_visible = !selected_segment_blink_visible;
+    update_all_selected_segments_visuals();
 }
 
 // 以兩次手動點選的線段為端點，計算中間應補上的列車線段與等待線
@@ -658,6 +712,7 @@ function select_wait_edge(waitEdge) {
     });
     waitLine.front();
     wait_edge_elements.set(waitEdgeId, waitLine);
+    update_wait_edge_visual(waitEdgeId);
 }
 
 // 移除指定的等待線
@@ -669,6 +724,33 @@ function deselect_wait_edge(waitEdgeId) {
 
     waitLine.remove();
     wait_edge_elements.delete(waitEdgeId);
+}
+
+// 依照目前閃爍狀態更新單一等待線的顯示
+function update_wait_edge_visual(waitEdgeId) {
+    const waitLine = wait_edge_elements.get(waitEdgeId);
+    if (!waitLine) {
+        return;
+    }
+
+    if (!selected_segments_blink_enabled || selected_segment_blink_visible) {
+        waitLine.attr({
+            opacity: 1,
+            'pointer-events': 'stroke'
+        });
+    } else {
+        waitLine.attr({
+            opacity: 0,
+            'pointer-events': 'none'
+        });
+    }
+}
+
+// 批次刷新所有等待線的顯示狀態
+function update_all_wait_edge_visuals() {
+    for (const waitEdgeId of wait_edge_elements.keys()) {
+        update_wait_edge_visual(waitEdgeId);
+    }
 }
 
 // 依線段 ID 取回對應的線段資料

@@ -116,14 +116,32 @@ function execute(json_data, live_json_data, date) {
 
 function initializeDiagramControls() {
     const routePlannerToggle = document.getElementById('route-planner-toggle');
-    if (!routePlannerToggle) {
+    if (routePlannerToggle) {
+        routePlannerToggle.checked = route_planning_enabled;
+        routePlannerToggle.onchange = function () {
+            route_planning_enabled = this.checked;
+        };
+    }
+
+    const selectedSegmentsBlinkToggle = document.getElementById('selected-segments-blink-toggle');
+    if (selectedSegmentsBlinkToggle) {
+        selectedSegmentsBlinkToggle.onclick = function () {
+            set_selected_segments_blink_enabled(!selected_segments_blink_enabled);
+            updateSelectedSegmentsBlinkButton();
+        };
+    }
+
+    updateSelectedSegmentsBlinkButton();
+}
+
+function updateSelectedSegmentsBlinkButton() {
+    const selectedSegmentsBlinkToggle = document.getElementById('selected-segments-blink-toggle');
+    if (!selectedSegmentsBlinkToggle) {
         return;
     }
 
-    routePlannerToggle.checked = route_planning_enabled;
-    routePlannerToggle.addEventListener('change', function () {
-        route_planning_enabled = this.checked;
-    });
+    selectedSegmentsBlinkToggle.classList.toggle('is-active', selected_segments_blink_enabled);
+    selectedSegmentsBlinkToggle.textContent = selected_segments_blink_enabled ? '停止閃爍選取路段' : '閃爍選取路段';
 }
 
 function finish_draw() {

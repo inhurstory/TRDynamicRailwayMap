@@ -13,6 +13,9 @@ let route_planning_enabled = false;
 let last_manual_selected_segment_id = null;
 let route_graph = null;
 let wait_edge_elements = new Map();
+let selected_segments_blink_enabled = false;
+let selected_segment_blink_interval_id = null;
+let selected_segment_blink_visible = true;
 
 // 公用const變數
 const DiagramHours = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 1, 2, 3, 4, 5, 6];

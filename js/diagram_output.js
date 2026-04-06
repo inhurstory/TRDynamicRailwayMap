@@ -114,11 +114,25 @@ function execute(json_data, live_json_data, date) {
     }
 }
 
+function initializeDiagramControls() {
+    const routePlannerToggle = document.getElementById('route-planner-toggle');
+    if (!routePlannerToggle) {
+        return;
+    }
+
+    routePlannerToggle.checked = route_planning_enabled;
+    routePlannerToggle.addEventListener('change', function () {
+        route_planning_enabled = this.checked;
+    });
+}
+
 function finish_draw() {
     // 移除讀取中的文字標示
     let popup = document.getElementById("popup");
     const parentObj = popup.parentNode;
     parentObj.removeChild(popup);
+
+    initializeDiagramControls();
 
     // 依照現在的時間，將視窗滾動到整點時間，方便使用者閱讀
     if (scrollToCurrentTime) {

@@ -86,6 +86,8 @@ function draw_diagram_background(line_kind, date) {
 function draw_train_path(all_trains_data, realtime_trains) {
     train_segments = [];
     selected_segment_ids = new Set();
+    segment_elements = new Map();
+    last_manual_selected_segment_id = null;
 
     for (let train_data of all_trains_data) {
         for (let [line_kind, train_no, train_kind, line, line_dir, value] of train_data) {
@@ -338,17 +340,10 @@ function add_train_segments(draw_object, line_kind, train_id, style, path_points
         });
 
         segment.on('click', function () {
-            if (selected_segment_ids.has(segment_id)) {
-                selected_segment_ids.delete(segment_id);
-                segment.removeClass('segment-selected');
-                segment.removeClass('segment-hover');
-            } else {
-                selected_segment_ids.add(segment_id);
-                segment.removeClass('segment-hover');
-                segment.addClass('segment-selected');
-            }
+            handle_segment_click(segment_id);
         });
 
+        segment_elements.set(segment_id, segment);
         train_segments.push({
             id: segment_id,
             line_kind: line_kind,
@@ -358,6 +353,140 @@ function add_train_segments(draw_object, line_kind, train_id, style, path_points
             to: end
         });
     }
+}
+
+function handle_segment_click(segment_id) {
+    if (selected_segment_ids.has(segment_id)) {
+        deselect_segment(segment_id);
+        if (last_manual_selected_segment_id === segment_id) {
+            last_manual_selected_segment_id = null;
+        }
+        return;
+    }
+
+    if (route_planning_enabled && last_manual_selected_segment_id && last_manual_selected_segment_id !== segment_id) {
+        const routeSegmentIds = find_segment_route(last_manual_selected_segment_id, segment_id);
+        if (routeSegmentIds.length > 0) {
+            for (const routeSegmentId of routeSegmentIds) {
+                select_segment(routeSegmentId);
+            }
+        } else {
+            select_segment(segment_id);
+        }
+    } else {
+        select_segment(segment_id);
+    }
+
+    last_manual_selected_segment_id = segment_id;
+}
+
+function select_segment(segment_id) {
+    const segment = segment_elements.get(segment_id);
+    if (!segment || selected_segment_ids.has(segment_id)) {
+        return;
+    }
+
+    selected_segment_ids.add(segment_id);
+    segment.removeClass('segment-hover');
+    segment.addClass('segment-selected');
+}
+
+function deselect_segment(segment_id) {
+    const segment = segment_elements.get(segment_id);
+    if (!segment || !selected_segment_ids.has(segment_id)) {
+        return;
+    }
+
+    selected_segment_ids.delete(segment_id);
+    segment.removeClass('segment-selected');
+    segment.removeClass('segment-hover');
+}
+
+function find_segment_route(startSegmentId, endSegmentId) {
+    if (startSegmentId === endSegmentId) {
+        return [startSegmentId];
+    }
+
+    const adjacency = build_segment_adjacency();
+    const queue = [startSegmentId];
+    const visited = new Set([startSegmentId]);
+    const previous = new Map();
+
+    while (queue.length > 0) {
+        const currentSegmentId = queue.shift();
+        const neighbors = adjacency.get(currentSegmentId) || [];
+
+        for (const neighborSegmentId of neighbors) {
+            if (visited.has(neighborSegmentId)) {
+                continue;
+            }
+
+            visited.add(neighborSegmentId);
+            previous.set(neighborSegmentId, currentSegmentId);
+
+            if (neighborSegmentId === endSegmentId) {
+                return rebuild_segment_route(previous, startSegmentId, endSegmentId);
+            }
+
+            queue.push(neighborSegmentId);
+        }
+    }
+
+    return [];
+}
+
+function build_segment_adjacency() {
+    const nodeToSegments = new Map();
+
+    for (const segment of train_segments) {
+        for (const nodeKey of [get_segment_node_key(segment.from), get_segment_node_key(segment.to)]) {
+            if (!nodeToSegments.has(nodeKey)) {
+                nodeToSegments.set(nodeKey, []);
+            }
+            nodeToSegments.get(nodeKey).push(segment.id);
+        }
+    }
+
+    const adjacency = new Map();
+    for (const segment of train_segments) {
+        adjacency.set(segment.id, new Set());
+    }
+
+    for (const segmentIds of nodeToSegments.values()) {
+        for (const segmentId of segmentIds) {
+            const neighbors = adjacency.get(segmentId);
+            for (const neighborSegmentId of segmentIds) {
+                if (neighborSegmentId !== segmentId) {
+                    neighbors.add(neighborSegmentId);
+                }
+            }
+        }
+    }
+
+    for (const [segmentId, neighborSet] of adjacency.entries()) {
+        adjacency.set(segmentId, Array.from(neighborSet));
+    }
+
+    return adjacency;
+}
+
+function rebuild_segment_route(previous, startSegmentId, endSegmentId) {
+    const routeSegmentIds = [endSegmentId];
+    let currentSegmentId = endSegmentId;
+
+    while (currentSegmentId !== startSegmentId) {
+        currentSegmentId = previous.get(currentSegmentId);
+        if (typeof currentSegmentId === 'undefined') {
+            return [];
+        }
+        routeSegmentIds.push(currentSegmentId);
+    }
+
+    return routeSegmentIds.reverse();
+}
+
+function get_segment_node_key(point) {
+    return `${point.id}-${point.x}-${point.y}`;
 }
 
 // 填充文字函式

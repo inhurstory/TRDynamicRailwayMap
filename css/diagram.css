@@ -1,3 +1,31 @@
+.diagram-controls {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
+    padding: 10px 14px;
+    background-color: rgba(255, 255, 255, 0.96);
+    border: 1px solid #b8b8b8;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.diagram-controls__label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #222;
+    cursor: pointer;
+}
+
+.diagram-controls__label input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+}
+
 .popup {
     position: fixed;
     top: 0;

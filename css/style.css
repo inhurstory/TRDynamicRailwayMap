@@ -19,12 +19,29 @@ path {
     fill: none
 }
 
-path:hover {
-    stroke-width: 6
+.train-path:hover {
+    stroke-width: 2.5
 }
 
-path:focus {
-    stroke-width: 6
+.train-path:focus {
+    stroke-width: 2.5
+}
+
+.train-segment {
+    fill: none;
+    opacity: 0;
+    pointer-events: stroke;
+    stroke-linecap: round;
+    stroke-width: 12;
+    transition-property: opacity, stroke-width;
+    transition-duration: 0.15s;
+    transition-timing-function: ease-out;
+}
+
+.train-segment.segment-hover,
+.train-segment.segment-selected {
+    opacity: 1;
+    stroke-width: 6;
 }
 
 /* 主要基線 */

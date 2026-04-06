@@ -84,6 +84,9 @@ function draw_diagram_background(line_kind, date) {
 
 // 繪製每一個車次線與車次標註文字
 function draw_train_path(all_trains_data, realtime_trains) {
+    train_segments = [];
+    selected_segment_ids = new Set();
+
     for (let train_data of all_trains_data) {
         for (let [line_kind, train_no, train_kind, line, line_dir, value] of train_data) {
             if (value.length > 2) {
@@ -131,6 +134,7 @@ function find_uncontinuous_index(value) {
 function set_path(line_kind, train_no, train_kind, value) {
     let path = "M";
     let coordinates = [];
+    let path_points = [];
     let style = CarKind[train_kind];
     const diagram_need_stop = find_diagram_need_to_stop(line_kind);
 
@@ -146,11 +150,22 @@ function set_path(line_kind, train_no, train_kind, value) {
         if (stop != -1 || diagram_need_stop.includes(id)) {
             path += x.toString() + ',' + y.toString() + ' ';
             coordinates.push([x, y]);
+            path_points.push({
+                dsc: dsc,
+                id: id,
+                time: time,
+                loc: loc,
+                stop: stop,
+                order: order,
+                x: x,
+                y: y
+            });
         }
     }
 
     let text_position = calculate_text_position(coordinates, style);
     add_path(diagram_objects[line_kind], line_kind, train_no, path, text_position, style);
+    add_train_segments(diagram_objects[line_kind], line_kind, train_no, style, path_points);
 }
 
 // 計算車次號標註的位置
@@ -281,7 +296,7 @@ function add_path(draw_object, line_kind, train_id, path_string, text_position, 
     const train_id_text = '#' + line_kind + train_id; // SVG.js 會檢查屬性是不是顏色，故不能單純只是用 #283 用車次號做 ID
 
     const path = draw_object.path(path_string);
-    path.attr({ class: style, id: line_kind + train_id });
+    path.attr({ class: `train-path ${style}`, id: line_kind + train_id });
 
     // 車次線文字標註(SVG path文字)
     for (const iterator of text_position) {
@@ -290,6 +305,58 @@ function add_path(draw_object, line_kind, train_id, path_string, text_position, 
         })
         const textpath = text.path();
         textpath.attr({ href: train_id_text, startOffset: iterator, class: style });
+    }
+}
+
+function add_train_segments(draw_object, line_kind, train_id, style, path_points) {
+    for (let i = 0; i < path_points.length - 1; i++) {
+        const start = path_points[i];
+        const end = path_points[i + 1];
+        const segment_id = `${line_kind}-${train_id}-${i}`;
+
+        const segment = draw_object.line(start.x, start.y, end.x, end.y);
+        segment.attr({
+            class: `train-segment ${style}`,
+            id: segment_id,
+            'data-segment-id': segment_id,
+            'data-line-kind': line_kind,
+            'data-train-id': train_id,
+            'data-from-station-id': start.id,
+            'data-to-station-id': end.id
+        });
+
+        segment.on('mouseover', function () {
+            if (!selected_segment_ids.has(segment_id)) {
+                segment.addClass('segment-hover');
+            }
+        });
+
+        segment.on('mouseout', function () {
+            if (!selected_segment_ids.has(segment_id)) {
+                segment.removeClass('segment-hover');
+            }
+        });
+
+        segment.on('click', function () {
+            if (selected_segment_ids.has(segment_id)) {
+                selected_segment_ids.delete(segment_id);
+                segment.removeClass('segment-selected');
+                segment.removeClass('segment-hover');
+            } else {
+                selected_segment_ids.add(segment_id);
+                segment.removeClass('segment-hover');
+                segment.addClass('segment-selected');
+            }
+        });
+
+        train_segments.push({
+            id: segment_id,
+            line_kind: line_kind,
+            train_id: train_id,
+            style: style,
+            from: start,
+            to: end
+        });
     }
 }
 

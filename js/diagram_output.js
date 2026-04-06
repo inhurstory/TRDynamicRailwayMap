@@ -53,6 +53,8 @@ function loadScript(file) {
 async function initial_data() {
     try {
         date = formattedDate ? formattedDate : getTodayFormattedDate('nodash'); // 如果 URL 中有指定日期則使用，否則用今天
+        is_today_diagram = date === getTodayFormattedDate('nodash');
+        current_segments_blink_enabled = is_today_diagram;
 
         const baseFiles = [
             readJSONFile(file1),
@@ -131,6 +133,15 @@ function initializeDiagramControls() {
         };
     }
 
+    const currentSegmentsBlinkToggle = document.getElementById('current-segments-blink-toggle');
+    if (currentSegmentsBlinkToggle) {
+        currentSegmentsBlinkToggle.hidden = !is_today_diagram;
+        currentSegmentsBlinkToggle.onclick = function () {
+            set_current_segments_blink_enabled(!current_segments_blink_enabled);
+            updateCurrentSegmentsBlinkButton();
+        };
+    }
+
     const clearAllSelectionsButton = document.getElementById('clear-all-selections-button');
     if (clearAllSelectionsButton) {
         clearAllSelectionsButton.onclick = function () {
@@ -138,7 +149,9 @@ function initializeDiagramControls() {
         };
     }
 
+    set_current_segments_blink_enabled(current_segments_blink_enabled);
     updateSelectedSegmentsBlinkButton();
+    updateCurrentSegmentsBlinkButton();
 }
 
 function updateSelectedSegmentsBlinkButton() {
@@ -149,6 +162,17 @@ function updateSelectedSegmentsBlinkButton() {
 
     selectedSegmentsBlinkToggle.classList.toggle('is-active', selected_segments_blink_enabled);
     selectedSegmentsBlinkToggle.textContent = selected_segments_blink_enabled ? '停止閃爍選取路段' : '閃爍選取路段';
+}
+
+function updateCurrentSegmentsBlinkButton() {
+    const currentSegmentsBlinkToggle = document.getElementById('current-segments-blink-toggle');
+    if (!currentSegmentsBlinkToggle) {
+        return;
+    }
+
+    currentSegmentsBlinkToggle.hidden = !is_today_diagram;
+    currentSegmentsBlinkToggle.classList.toggle('is-active', current_segments_blink_enabled);
+    currentSegmentsBlinkToggle.textContent = current_segments_blink_enabled ? '停止閃爍目前已選線段' : '閃爍目前已選線段';
 }
 
 function finish_draw() {

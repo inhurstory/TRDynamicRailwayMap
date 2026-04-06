@@ -16,6 +16,12 @@ let wait_edge_elements = new Map();
 let selected_segments_blink_enabled = false;
 let selected_segment_blink_interval_id = null;
 let selected_segment_blink_visible = true;
+let current_time_segment_ids = new Set();
+let current_segments_blink_enabled = false;
+let current_segment_blink_interval_id = null;
+let current_segment_blink_visible = true;
+let current_segment_refresh_interval_id = null;
+let is_today_diagram = false;
 
 // 公用const變數
 const DiagramHours = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 1, 2, 3, 4, 5, 6];

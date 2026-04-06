@@ -117,6 +117,17 @@ function execute(json_data, live_json_data, date) {
 }
 
 function initializeDiagramControls() {
+    const diagramControls = document.getElementById('diagram-controls');
+    const diagramControlsCollapseToggle = document.getElementById('diagram-controls-collapse-toggle');
+    if (diagramControls && diagramControlsCollapseToggle) {
+        diagramControlsCollapseToggle.onclick = function () {
+            const isCollapsed = diagramControls.classList.toggle('diagram-controls--collapsed');
+            diagramControlsCollapseToggle.textContent = isCollapsed ? '展開' : '收合';
+            diagramControlsCollapseToggle.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+            diagramControlsCollapseToggle.setAttribute('aria-label', isCollapsed ? '展開功能選單' : '收合功能選單');
+        };
+    }
+
     const routePlannerToggle = document.getElementById('route-planner-toggle');
     if (routePlannerToggle) {
         routePlannerToggle.checked = route_planning_enabled;

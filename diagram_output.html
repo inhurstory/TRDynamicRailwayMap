@@ -10,13 +10,19 @@
 
 <body>
     <div id="diagram-controls" class="diagram-controls">
-        <label class="diagram-controls__label">
-            <input type="checkbox" id="route-planner-toggle">
-            <span>開啟路徑規劃</span>
-        </label>
-        <button type="button" id="selected-segments-blink-toggle" class="diagram-controls__button">閃爍選取路段</button>
-        <button type="button" id="current-segments-blink-toggle" class="diagram-controls__button">閃爍目前已選線段</button>
-        <button type="button" id="clear-all-selections-button" class="diagram-controls__button diagram-controls__button--danger">取消所有選取</button>
+        <div class="diagram-controls__header">
+            <span class="diagram-controls__title">功能選單</span>
+            <button type="button" id="diagram-controls-collapse-toggle" class="diagram-controls__icon-button" aria-expanded="true" aria-label="收合功能選單">收合</button>
+        </div>
+        <div id="diagram-controls-body" class="diagram-controls__body">
+            <label class="diagram-controls__label">
+                <input type="checkbox" id="route-planner-toggle">
+                <span>開啟路徑規劃</span>
+            </label>
+            <button type="button" id="selected-segments-blink-toggle" class="diagram-controls__button">閃爍選取路段</button>
+            <button type="button" id="current-segments-blink-toggle" class="diagram-controls__button">閃爍目前已選線段</button>
+            <button type="button" id="clear-all-selections-button" class="diagram-controls__button diagram-controls__button--danger">取消所有選取</button>
+        </div>
     </div>
     <div id="popup" class="popup">
         <div class="msg">

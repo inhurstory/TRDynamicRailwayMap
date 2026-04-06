@@ -88,6 +88,8 @@ function draw_train_path(all_trains_data, realtime_trains) {
     selected_segment_ids = new Set();
     segment_elements = new Map();
     last_manual_selected_segment_id = null;
+    route_graph = null;
+    wait_edge_elements = new Map();
 
     for (let train_data of all_trains_data) {
         for (let [line_kind, train_no, train_kind, line, line_dir, value] of train_data) {
@@ -113,6 +115,8 @@ function draw_train_path(all_trains_data, realtime_trains) {
             }
         }
     }
+
+    route_graph = build_route_graph();
 }
 
 // 找出不連續資料的函式
@@ -355,6 +359,7 @@ function add_train_segments(draw_object, line_kind, train_id, style, path_points
     }
 }
 
+// 線段點擊後的主流程，依設定決定是單獨選取或自動補齊路徑
 function handle_segment_click(segment_id) {
     if (selected_segment_ids.has(segment_id)) {
         deselect_segment(segment_id);
@@ -365,11 +370,15 @@ function handle_segment_click(segment_id) {
     }
 
     if (route_planning_enabled && last_manual_selected_segment_id && last_manual_selected_segment_id !== segment_id) {
-        const routeSegmentIds = find_segment_route(last_manual_selected_segment_id, segment_id);
-        if (routeSegmentIds.length > 0) {
-            for (const routeSegmentId of routeSegmentIds) {
+        const routeResult = find_segment_route(last_manual_selected_segment_id, segment_id);
+        if (routeResult.segmentIds.length > 0 || routeResult.waitEdges.length > 0) {
+            for (const routeSegmentId of routeResult.segmentIds) {
                 select_segment(routeSegmentId);
             }
+            for (const waitEdge of routeResult.waitEdges) {
+                select_wait_edge(waitEdge);
+            }
+            select_segment(segment_id);
         } else {
             select_segment(segment_id);
         }
@@ -380,6 +389,7 @@ function handle_segment_click(segment_id) {
     last_manual_selected_segment_id = segment_id;
 }
 
+// 選取指定的列車線段並套用選取樣式
 function select_segment(segment_id) {
     const segment = segment_elements.get(segment_id);
     if (!segment || selected_segment_ids.has(segment_id)) {
@@ -391,6 +401,7 @@ function select_segment(segment_id) {
     segment.addClass('segment-selected');
 }
 
+// 取消指定列車線段的選取狀態
 function deselect_segment(segment_id) {
     const segment = segment_elements.get(segment_id);
     if (!segment || !selected_segment_ids.has(segment_id)) {
@@ -402,91 +413,294 @@ function deselect_segment(segment_id) {
     segment.removeClass('segment-hover');
 }
 
+// 以兩次手動點選的線段為端點，計算中間應補上的列車線段與等待線
 function find_segment_route(startSegmentId, endSegmentId) {
     if (startSegmentId === endSegmentId) {
-        return [startSegmentId];
+        return { segmentIds: [startSegmentId], waitEdges: [] };
     }
 
-    const adjacency = build_segment_adjacency();
-    const queue = [startSegmentId];
-    const visited = new Set([startSegmentId]);
-    const previous = new Map();
+    const startSegment = get_segment_by_id(startSegmentId);
+    const endSegment = get_segment_by_id(endSegmentId);
+    if (!startSegment || !endSegment || !route_graph) {
+        return { segmentIds: [], waitEdges: [] };
+    }
 
-    while (queue.length > 0) {
-        const currentSegmentId = queue.shift();
-        const neighbors = adjacency.get(currentSegmentId) || [];
+    const startOptions = get_segment_endpoint_options(startSegment, true);
+    const endOptions = get_segment_endpoint_options(endSegment, false);
+    let bestResult = null;
 
-        for (const neighborSegmentId of neighbors) {
-            if (visited.has(neighborSegmentId)) {
+    for (const startOption of startOptions) {
+        for (const endOption of endOptions) {
+            const pathResult = find_shortest_route_between_nodes(startOption.nodeKey, endOption.nodeKey);
+            if (!pathResult) {
                 continue;
             }
 
-            visited.add(neighborSegmentId);
-            previous.set(neighborSegmentId, currentSegmentId);
-
-            if (neighborSegmentId === endSegmentId) {
-                return rebuild_segment_route(previous, startSegmentId, endSegmentId);
+            const totalCost = pathResult.cost + startOption.penalty + endOption.penalty;
+            if (!bestResult || totalCost < bestResult.totalCost) {
+                bestResult = {
+                    totalCost: totalCost,
+                    pathEdges: pathResult.pathEdges
+                };
             }
-
-            queue.push(neighborSegmentId);
         }
     }
 
-    return [];
+    if (!bestResult) {
+        return { segmentIds: [], waitEdges: [] };
+    }
+
+    const segmentIds = [];
+    const waitEdges = [];
+
+    for (const edge of bestResult.pathEdges) {
+        if (edge.type === 'travel') {
+            if (edge.segmentId !== startSegmentId && edge.segmentId !== endSegmentId) {
+                segmentIds.push(edge.segmentId);
+            }
+        } else if (edge.type === 'wait') {
+            waitEdges.push(edge);
+        }
+    }
+
+    return {
+        segmentIds: Array.from(new Set(segmentIds)),
+        waitEdges: waitEdges
+    };
 }
 
-function build_segment_adjacency() {
-    const nodeToSegments = new Map();
-
-    for (const segment of train_segments) {
-        for (const nodeKey of [get_segment_node_key(segment.from), get_segment_node_key(segment.to)]) {
-            if (!nodeToSegments.has(nodeKey)) {
-                nodeToSegments.set(nodeKey, []);
-            }
-            nodeToSegments.get(nodeKey).push(segment.id);
-        }
-    }
-
+// 建立時間空間圖：列車移動為 travel edge，同站等待為 wait edge
+function build_route_graph() {
+    const nodeMap = new Map();
     const adjacency = new Map();
-    for (const segment of train_segments) {
-        adjacency.set(segment.id, new Set());
+    const stationNodeMap = new Map();
+
+    function ensureNode(point) {
+        const nodeKey = get_route_node_key(point);
+        if (!nodeMap.has(nodeKey)) {
+            nodeMap.set(nodeKey, {
+                key: nodeKey,
+                stationId: point.id,
+                time: point.time,
+                x: point.x,
+                y: point.y
+            });
+            adjacency.set(nodeKey, []);
+        }
+        return nodeKey;
     }
 
-    for (const segmentIds of nodeToSegments.values()) {
-        for (const segmentId of segmentIds) {
-            const neighbors = adjacency.get(segmentId);
-            for (const neighborSegmentId of segmentIds) {
-                if (neighborSegmentId !== segmentId) {
-                    neighbors.add(neighborSegmentId);
-                }
+    for (const segment of train_segments) {
+        const fromNodeKey = ensureNode(segment.from);
+        const toNodeKey = ensureNode(segment.to);
+        const duration = Math.max(0, segment.to.time - segment.from.time);
+
+        adjacency.get(fromNodeKey).push({
+            type: 'travel',
+            fromNodeKey: fromNodeKey,
+            toNodeKey: toNodeKey,
+            cost: build_route_cost(duration, true),
+            segmentId: segment.id
+        });
+
+        if (!stationNodeMap.has(segment.from.id)) {
+            stationNodeMap.set(segment.from.id, new Set());
+        }
+        if (!stationNodeMap.has(segment.to.id)) {
+            stationNodeMap.set(segment.to.id, new Set());
+        }
+        stationNodeMap.get(segment.from.id).add(fromNodeKey);
+        stationNodeMap.get(segment.to.id).add(toNodeKey);
+    }
+
+    for (const nodeKeys of stationNodeMap.values()) {
+        const orderedNodes = Array.from(nodeKeys)
+            .map((nodeKey) => nodeMap.get(nodeKey))
+            .sort((a, b) => a.time - b.time);
+
+        for (let i = 0; i < orderedNodes.length - 1; i++) {
+            const currentNode = orderedNodes[i];
+            const nextNode = orderedNodes[i + 1];
+            const waitCost = Math.max(0, nextNode.time - currentNode.time);
+
+            adjacency.get(currentNode.key).push({
+                type: 'wait',
+                fromNodeKey: currentNode.key,
+                toNodeKey: nextNode.key,
+                cost: build_route_cost(waitCost, false),
+                stationId: currentNode.stationId,
+                x1: currentNode.x,
+                y1: currentNode.y,
+                x2: nextNode.x,
+                y2: nextNode.y
+            });
+        }
+    }
+
+    return {
+        nodes: nodeMap,
+        adjacency: adjacency
+    };
+}
+
+// 在時間空間圖上以最短路徑找出兩節點間的最佳路線
+function find_shortest_route_between_nodes(startNodeKey, endNodeKey) {
+    if (startNodeKey === endNodeKey) {
+        return { cost: 0, pathEdges: [] };
+    }
+
+    const distances = new Map();
+    const previous = new Map();
+    const pending = new Set(route_graph.nodes.keys());
+
+    for (const nodeKey of pending) {
+        distances.set(nodeKey, Number.POSITIVE_INFINITY);
+    }
+    distances.set(startNodeKey, 0);
+
+    while (pending.size > 0) {
+        let currentNodeKey = null;
+        let currentDistance = Number.POSITIVE_INFINITY;
+
+        for (const nodeKey of pending) {
+            const distance = distances.get(nodeKey);
+            if (distance < currentDistance) {
+                currentDistance = distance;
+                currentNodeKey = nodeKey;
+            }
+        }
+
+        if (currentNodeKey === null || currentDistance === Number.POSITIVE_INFINITY) {
+            break;
+        }
+
+        pending.delete(currentNodeKey);
+        if (currentNodeKey === endNodeKey) {
+            break;
+        }
+
+        const edges = route_graph.adjacency.get(currentNodeKey) || [];
+        for (const edge of edges) {
+            if (!pending.has(edge.toNodeKey)) {
+                continue;
+            }
+
+            const candidateDistance = currentDistance + edge.cost;
+            if (candidateDistance < distances.get(edge.toNodeKey)) {
+                distances.set(edge.toNodeKey, candidateDistance);
+                previous.set(edge.toNodeKey, {
+                    fromNodeKey: currentNodeKey,
+                    edge: edge
+                });
             }
         }
     }
 
-    for (const [segmentId, neighborSet] of adjacency.entries()) {
-        adjacency.set(segmentId, Array.from(neighborSet));
+    if (!previous.has(endNodeKey)) {
+        return null;
     }
 
-    return adjacency;
-}
-
-function rebuild_segment_route(previous, startSegmentId, endSegmentId) {
-    const routeSegmentIds = [endSegmentId];
-    let currentSegmentId = endSegmentId;
-
-    while (currentSegmentId !== startSegmentId) {
-        currentSegmentId = previous.get(currentSegmentId);
-        if (typeof currentSegmentId === 'undefined') {
-            return [];
+    const pathEdges = [];
+    let currentNodeKey = endNodeKey;
+    while (currentNodeKey !== startNodeKey) {
+        const step = previous.get(currentNodeKey);
+        if (!step) {
+            return null;
         }
-        routeSegmentIds.push(currentSegmentId);
+        pathEdges.push(step.edge);
+        currentNodeKey = step.fromNodeKey;
     }
 
-    return routeSegmentIds.reverse();
+    pathEdges.reverse();
+    return {
+        cost: distances.get(endNodeKey),
+        pathEdges: pathEdges
+    };
 }
 
-function get_segment_node_key(point) {
-    return `${point.id}-${point.x}-${point.y}`;
+// 為起點與終點線段挑選較合理的接續端點，降低倒退接線的機率
+function get_segment_endpoint_options(segment, isStartSegment) {
+    const preferredPoint = isStartSegment ? get_later_point(segment.from, segment.to) : get_earlier_point(segment.from, segment.to);
+    const alternatePoint = isStartSegment ? get_earlier_point(segment.from, segment.to) : get_later_point(segment.from, segment.to);
+    const durationPenalty = build_route_cost(Math.abs(segment.to.time - segment.from.time), true);
+
+    return [
+        {
+            nodeKey: get_route_node_key(preferredPoint),
+            penalty: 0
+        },
+        {
+            nodeKey: get_route_node_key(alternatePoint),
+            penalty: durationPenalty
+        }
+    ];
+}
+
+// 繪製並記錄一條可獨立移除的等待線
+function select_wait_edge(waitEdge) {
+    const waitEdgeId = `${waitEdge.stationId}-${waitEdge.fromNodeKey}-${waitEdge.toNodeKey}`;
+    if (wait_edge_elements.has(waitEdgeId)) {
+        return;
+    }
+
+    const drawObject = diagram_objects[line_kind];
+    if (!drawObject) {
+        return;
+    }
+
+    const waitLine = drawObject.line(waitEdge.x1, waitEdge.y1, waitEdge.x2, waitEdge.y2);
+    waitLine.attr({
+        class: 'route-wait-edge',
+        'data-wait-edge-id': waitEdgeId
+    });
+    waitLine.on('click', function () {
+        deselect_wait_edge(waitEdgeId);
+    });
+    waitLine.front();
+    wait_edge_elements.set(waitEdgeId, waitLine);
+}
+
+// 移除指定的等待線
+function deselect_wait_edge(waitEdgeId) {
+    const waitLine = wait_edge_elements.get(waitEdgeId);
+    if (!waitLine) {
+        return;
+    }
+
+    waitLine.remove();
+    wait_edge_elements.delete(waitEdgeId);
+}
+
+// 依線段 ID 取回對應的線段資料
+function get_segment_by_id(segmentId) {
+    for (const segment of train_segments) {
+        if (segment.id === segmentId) {
+            return segment;
+        }
+    }
+    return null;
+}
+
+// 產生時間空間圖節點的唯一鍵值，格式為 車站ID-時間
+function get_route_node_key(point) {
+    return `${point.id}-${point.time}`;
+}
+
+// 回傳兩個端點中時間較早的那一個
+function get_earlier_point(pointA, pointB) {
+    return pointA.time <= pointB.time ? pointA : pointB;
+}
+
+// 回傳兩個端點中時間較晚的那一個
+function get_later_point(pointA, pointB) {
+    return pointA.time >= pointB.time ? pointA : pointB;
+}
+
+// 建立路徑規劃的權重值：先比總時間，再以極小懲罰避免不必要的搭車繞路
+function build_route_cost(duration, includesTravel) {
+    const timeCost = Math.max(0, duration) * 1000;
+    const travelPenalty = includesTravel ? 1 : 0;
+    return timeCost + travelPenalty;
 }
 
 // 填充文字函式

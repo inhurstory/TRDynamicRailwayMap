@@ -457,6 +457,22 @@ function set_selected_segments_blink_enabled(enabled) {
     update_all_selected_segments_visuals();
 }
 
+// 清除目前所有已選路段與等待線
+function clear_all_selected_items() {
+    const selectedSegmentIds = Array.from(selected_segment_ids);
+    for (const segment_id of selectedSegmentIds) {
+        deselect_segment(segment_id);
+    }
+
+    const waitEdgeIds = Array.from(wait_edge_elements.keys());
+    for (const waitEdgeId of waitEdgeIds) {
+        deselect_wait_edge(waitEdgeId);
+    }
+
+    last_manual_selected_segment_id = null;
+    selected_segment_blink_visible = true;
+}
+
 // 將所有已選路段在顯示與隱藏間切換，重播既有選取動畫
 function toggle_selected_segments_blink_visibility() {
     if (!selected_segments_blink_enabled) {

@@ -131,6 +131,13 @@ function initializeDiagramControls() {
         };
     }
 
+    const clearAllSelectionsButton = document.getElementById('clear-all-selections-button');
+    if (clearAllSelectionsButton) {
+        clearAllSelectionsButton.onclick = function () {
+            clear_all_selected_items();
+        };
+    }
+
     updateSelectedSegmentsBlinkButton();
 }
 

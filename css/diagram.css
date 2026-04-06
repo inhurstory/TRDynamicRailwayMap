@@ -52,6 +52,15 @@
     color: #ffffff;
 }
 
+.diagram-controls__button--danger {
+    border-color: #9c2f2f;
+    color: #8a1f1f;
+}
+
+.diagram-controls__button--danger:hover {
+    background-color: #fdeeee;
+}
+
 .popup {
     position: fixed;
     top: 0;

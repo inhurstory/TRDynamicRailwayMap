@@ -2,8 +2,12 @@
 const url = new URL(location.href);
 const line_kind = url.searchParams.get('lineKind');
 const formattedDate = url.searchParams.get('formattedDate');
+const branch = url.searchParams.get('branch');
 const loadRealtimeParam = url.searchParams.get('realtime');
 const scrollToCurrentTimeParam = url.searchParams.get('scrollToCurrentTime');
+
+const githubOwner = 'inhurstory';
+const githubRepo = 'TRDynamicRailwayMap';
 
 // 公用變數
 let date = null;
@@ -55,6 +59,9 @@ async function initial_data() {
         date = formattedDate ? formattedDate : getTodayFormattedDate('nodash'); // 如果 URL 中有指定日期則使用，否則用今天
         is_today_diagram = date === getTodayFormattedDate('nodash');
         current_segments_blink_enabled = is_today_diagram;
+        const diagramDataFile = branch
+            ? `https://raw.githubusercontent.com/${githubOwner}/${githubRepo}/${encodeURIComponent(branch)}/data/${date}.json`
+            : `data/${date}.json`;
 
         const baseFiles = [
             readJSONFile(file1),
@@ -62,7 +69,7 @@ async function initial_data() {
             readJSONFile(file3),
             readJSONFile(file4),
             readJSONFile(file5),
-            readJSONFile(`data/${date}.json`)
+            readJSONFile(diagramDataFile)
         ];
 
         const results = await Promise.all(baseFiles);

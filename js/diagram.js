@@ -336,16 +336,30 @@ function add_train_segments(draw_object, line_kind, train_id, style, path_points
             'data-to-station-id': end.id
         });
 
-        segment.on('mouseover', function () {
+        segment.on('mouseover', function (e) {
             if (!selected_segment_ids.has(segment_id)) {
                 segment.addClass('segment-hover');
             }
+            const tooltip = document.getElementById('segment-tooltip');
+            const fromTime = format_minutes(start.time);
+            const toTime = format_minutes(end.time);
+            tooltip.innerHTML = `車次：${train_id}<br>${start.dsc} ${fromTime} → ${end.dsc} ${toTime}`;
+            tooltip.style.display = 'block';
+            tooltip.style.left = (e.clientX + 14) + 'px';
+            tooltip.style.top = (e.clientY - 40) + 'px';
+        });
+
+        segment.on('mousemove', function (e) {
+            const tooltip = document.getElementById('segment-tooltip');
+            tooltip.style.left = (e.clientX + 14) + 'px';
+            tooltip.style.top = (e.clientY - 40) + 'px';
         });
 
         segment.on('mouseout', function () {
             if (!selected_segment_ids.has(segment_id)) {
                 segment.removeClass('segment-hover');
             }
+            document.getElementById('segment-tooltip').style.display = 'none';
         });
 
         segment.on('click', function () {
@@ -957,6 +971,12 @@ function get_now_time_x_axis(minus_time) {
     const x = SVG_X_Axis[`${hours}:${minutes}:${seconds}`].ax1 * 10 - 1200 * DiagramHours[0] + 50;
     // const x = SVG_X_Axis["15:30:00"].ax1 * 10 - 1200 * DiagramHours[0] + 50;
     return x;
+}
+
+function format_minutes(minutes) {
+    const h = Math.floor(minutes / 60) % 24;
+    const m = minutes % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 }
 
 // 找出運行圖中必須標註的車站

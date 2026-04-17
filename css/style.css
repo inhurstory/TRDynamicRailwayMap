@@ -44,6 +44,20 @@ path {
     stroke-width: 6;
 }
 
+.segment-tooltip {
+    position: fixed;
+    background: rgba(30, 30, 30, 0.92);
+    color: #fff;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    line-height: 1.6;
+    pointer-events: none;
+    z-index: 9999;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
 .route-wait-edge {
     fill: none;
     cursor: pointer;
